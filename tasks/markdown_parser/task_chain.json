@@ -1,0 +1,36 @@
+{
+  "name": "markdown_parser_evolution",
+  "description": "A 5-step task chain that evolves a minimal Markdown parser, testing the agent's ability to handle increasingly complex parsing requirements while maintaining code quality.",
+  "steps": [
+    {
+      "step_id": 1,
+      "task_type": "feature",
+      "instruction": "Add support for Markdown links and images. Links have the syntax [text](url) and should be converted to <a href=\"url\">text</a>. Images have the syntax ![alt](src) and should be converted to <img src=\"src\" alt=\"alt\" />. These should work within paragraphs alongside bold and italic text.",
+      "test_file": "test_step1_links.py"
+    },
+    {
+      "step_id": 2,
+      "task_type": "feature",
+      "instruction": "Add support for unordered lists. Lines starting with '- ' (dash space) should be grouped into <ul><li>...</li></ul> blocks. Consecutive list items should be in the same <ul> block. List items should support inline formatting (bold, italic, links). Non-list lines between list blocks should end the current list.",
+      "test_file": "test_step2_lists.py"
+    },
+    {
+      "step_id": 3,
+      "task_type": "bugfix",
+      "instruction": "Fix the following bugs: (1) parse_bold and parse_italic conflict — text like ***bold and italic*** should render as <strong><em>bold and italic</em></strong>, not break. (2) Empty lines should be preserved as empty strings in output, not dropped. (3) Lines with only whitespace should be treated as empty lines.",
+      "test_file": "test_step3_bugfix.py"
+    },
+    {
+      "step_id": 4,
+      "task_type": "refactor",
+      "instruction": "Refactor the code into a MarkdownParser class. The class should have a render(markdown: str) -> str method. It should support registering custom inline patterns via a method register_pattern(name: str, pattern: str, replacement: str) that adds new regex-based transformations. Keep the module-level render() function working for backward compatibility.",
+      "test_file": "test_step4_refactor.py"
+    },
+    {
+      "step_id": 5,
+      "task_type": "evolution",
+      "instruction": "Add support for code blocks. Inline code with `code` syntax should be converted to <code>code</code>. Fenced code blocks (lines between ``` markers) should be converted to <pre><code>...</code></pre> blocks. Content inside code blocks should NOT have any other Markdown formatting applied (no bold, italic, links, etc. inside code).",
+      "test_file": "test_step5_code.py"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "name": "file_manager_evolution",
+  "description": "A 5-step task chain that evolves a minimal in-memory file manager, testing the agent's ability to handle state management and architectural evolution.",
+  "steps": [
+    {
+      "step_id": 1,
+      "task_type": "feature",
+      "instruction": "Add directory support. Add functions: create_dir(path) that creates a directory (raise FileExistsError if exists), list_dir(path) that lists contents of a directory (files and subdirs, raise FileNotFoundError if dir doesn't exist), and is_dir(path) that returns True if path is a directory. Directories are represented as paths ending with '/'. Files inside directories should be listed when listing the parent directory. The root directory '/' always exists.",
+      "test_file": "test_step1_dirs.py"
+    },
+    {
+      "step_id": 2,
+      "task_type": "bugfix",
+      "instruction": "Fix path handling bugs: (1) Paths should be normalized — 'a//b' and 'a/b' should refer to the same file. (2) Creating a file should auto-create parent directories if they don't exist. (3) Deleting a directory should raise an error if it's not empty (raise OSError with message containing 'not empty'). Add a function delete_dir(path, recursive=False) where recursive=True deletes everything inside.",
+      "test_file": "test_step2_bugfix.py"
+    },
+    {
+      "step_id": 3,
+      "task_type": "feature",
+      "instruction": "Add file metadata support. Each file should track: 'created_at' (timestamp as float, use time.time()), 'modified_at' (updated on write), and 'size' (length of content in bytes). Add a function get_info(path) that returns a dict with keys 'path', 'size', 'created_at', 'modified_at', 'is_dir'. Also add update_file(path, content) that overwrites file content and updates modified_at.",
+      "test_file": "test_step3_metadata.py"
+    },
+    {
+      "step_id": 4,
+      "task_type": "refactor",
+      "instruction": "Refactor the code to use a FileSystem class that encapsulates all state. Each FileSystem instance should have independent state. The class should have all previously defined methods. Keep the module-level functions working for backward compatibility (they can delegate to a default FileSystem instance).",
+      "test_file": "test_step4_refactor.py"
+    },
+    {
+      "step_id": 5,
+      "task_type": "evolution",
+      "instruction": "Add a search feature to the FileSystem class. Add a method search(pattern: str, path: str = '/') -> list that searches for files whose path matches the given glob-like pattern (support '*' as wildcard for any characters within a path segment, and '**' for recursive matching across directories). Return a sorted list of matching file paths. For example: search('*.txt') matches all .txt files in root, search('**/*.py') matches all .py files recursively.",
+      "test_file": "test_step5_search.py"
+    }
+  ]
+}

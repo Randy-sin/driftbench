@@ -1,246 +1,329 @@
 """
-DriftBench Visualizer — Generate radar charts and comparison plots
-for benchmark results.
+DriftBench Visualize — Publication-quality visualization suite.
+
+v2.0: Multi-model comparison, entropy trajectory, heatmaps,
+      per-step regression waterfall, and aggregate dashboards.
 """
 
 import json
-import math
-from dataclasses import asdict
+import os
 from pathlib import Path
+from typing import Optional
 
 import matplotlib
-matplotlib.use("Agg")
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
 
 
-def plot_radar_chart(grade_reports: dict, output_path: str):
-    """
-    Generate a radar chart comparing multiple agents across DriftBench dimensions.
+# ── Color palette ──────────────────────────────────────────────
+COLORS = {
+    "Naive Baseline": "#e74c3c",
+    "gpt-4.1-mini": "#3498db",
+    "gpt-4.1-nano": "#2ecc71",
+    "gemini-2.5-flash": "#9b59b6",
+}
 
-    Args:
-        grade_reports: Dict mapping agent_name -> GradeReport
-        output_path: Path to save the PNG file
+def _color(agent_name: str) -> str:
+    for key, c in COLORS.items():
+        if key in agent_name:
+            return c
+    return "#95a5a6"
+
+
+# ── 1. Radar Chart (multi-agent overlay) ──────────────────────
+def plot_radar_chart(grades: dict, output_path: str):
+    """
+    Radar chart comparing multiple agents across scoring dimensions.
+    grades: {agent_name: GradeReport}
     """
     categories = [
-        "Functional\nCorrectness",
-        "Regression\nResistance",
-        "Entropy\nResistance",
-        "Architectural\nConsistency",
-        "Refactor\nAwareness",
-        "Engineering\nTaste",
+        "Functional", "Regression", "Entropy",
+        "Erosion", "Consistency", "Refactor\nAwareness", "Taste"
     ]
     N = len(categories)
-
-    fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
-
-    angles = [n / float(N) * 2 * math.pi for n in range(N)]
+    angles = np.linspace(0, 2 * np.pi, N, endpoint=False).tolist()
     angles += angles[:1]
 
-    colors = ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", "#DDA0DD"]
+    fig, ax = plt.subplots(figsize=(8, 8), subplot_kw=dict(polar=True))
+    ax.set_theta_offset(np.pi / 2)
+    ax.set_theta_direction(-1)
+    ax.set_rlabel_position(0)
+    plt.yticks([20, 40, 60, 80, 100], ["20", "40", "60", "80", "100"],
+               color="grey", size=8)
+    plt.ylim(0, 100)
 
-    for idx, (agent_name, report) in enumerate(grade_reports.items()):
+    for agent_name, grade in grades.items():
         values = [
-            report.functional_score,
-            report.regression_score,
-            report.entropy_score,
-            report.consistency_score,
-            report.refactor_awareness_score,
-            report.taste_score,
+            grade.functional_score, grade.regression_score,
+            grade.entropy_score, grade.erosion_score,
+            grade.consistency_score, grade.refactor_awareness_score,
+            grade.taste_score
         ]
         values += values[:1]
-
-        color = colors[idx % len(colors)]
-        ax.plot(angles, values, 'o-', linewidth=2.5, label=agent_name, color=color)
-        ax.fill(angles, values, alpha=0.15, color=color)
+        color = _color(agent_name)
+        ax.plot(angles, values, 'o-', linewidth=2, label=agent_name, color=color)
+        ax.fill(angles, values, alpha=0.1, color=color)
 
     ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(categories, size=11, fontweight='bold')
-    ax.set_ylim(0, 100)
-    ax.set_yticks([20, 40, 60, 80, 100])
-    ax.set_yticklabels(["20", "40", "60", "80", "100"], size=9, color="grey")
-    ax.grid(True, linestyle='--', alpha=0.5)
-
-    ax.set_title("DriftBench: Agent Entropy Resistance Profile",
-                 size=16, fontweight='bold', pad=30)
-    ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1.1), fontsize=12)
-
+    ax.set_xticklabels(categories, size=10)
+    ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1.1), fontsize=9)
+    plt.title("DriftBench Multi-Dimensional Score Comparison", size=14, y=1.08, fontweight='bold')
     plt.tight_layout()
-    plt.savefig(output_path, dpi=150, bbox_inches='tight', facecolor='white')
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
     plt.close()
-    print(f"Radar chart saved to {output_path}")
+    print(f"  Saved radar chart: {output_path}")
 
 
-def plot_step_progression(trial_results: dict, output_path: str):
+# ── 2. Entropy Trajectory (per-step CC + erosion) ─────────────
+def plot_entropy_trajectory(all_trajectories: dict, output_path: str):
     """
-    Plot how each agent's cumulative regression rate evolves across steps.
-
-    Args:
-        trial_results: Dict mapping agent_name -> TrialResult
-        output_path: Path to save the PNG file
+    Line chart showing per-step complexity evolution for each agent.
+    all_trajectories: {agent_name: list of {step_id, avg_cc, structural_erosion, ...}}
     """
-    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
-    colors = ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", "#DDA0DD"]
+    for agent_name, traj in all_trajectories.items():
+        if not traj:
+            continue
+        steps = [t["step_id"] for t in traj]
+        cc = [t["avg_cc"] for t in traj]
+        erosion = [t["structural_erosion"] for t in traj]
+        color = _color(agent_name)
 
-    # Left plot: Cumulative regression rate per step
-    ax1 = axes[0]
-    for idx, (agent_name, trial) in enumerate(trial_results.items()):
-        steps = []
-        cum_regressions = []
-        cum_total = []
-        running_reg = 0
-        running_total = 0
+        ax1.plot(steps, cc, 'o-', label=agent_name, color=color, linewidth=2, markersize=6)
+        ax2.plot(steps, erosion, 's-', label=agent_name, color=color, linewidth=2, markersize=6)
 
-        for sr in trial.step_results:
-            running_reg += sr.regression_failures
-            running_total += sr.total_previous_tests
-            steps.append(sr.step_id)
-            rate = running_reg / max(running_total, 1) * 100
-            cum_regressions.append(rate)
-
-        color = colors[idx % len(colors)]
-        ax1.plot(steps, cum_regressions, 'o-', linewidth=2.5,
-                 label=agent_name, color=color, markersize=8)
-
-    ax1.set_xlabel("Task Step", fontsize=12, fontweight='bold')
-    ax1.set_ylabel("Cumulative Regression Rate (%)", fontsize=12, fontweight='bold')
-    ax1.set_title("Regression Accumulation Over Task Chain", fontsize=14, fontweight='bold')
-    ax1.legend(fontsize=11)
+    ax1.set_xlabel("Task Step", fontsize=11)
+    ax1.set_ylabel("Average Cyclomatic Complexity", fontsize=11)
+    ax1.set_title("Complexity Trajectory", fontsize=13, fontweight='bold')
+    ax1.legend(fontsize=9)
     ax1.grid(True, alpha=0.3)
-    ax1.set_ylim(-5, 105)
 
-    # Right plot: Pass/Fail heatmap
-    ax2 = axes[1]
-    agent_names = list(trial_results.keys())
-    max_steps = max(len(t.step_results) for t in trial_results.values())
+    ax2.set_xlabel("Task Step", fontsize=11)
+    ax2.set_ylabel("Structural Erosion", fontsize=11)
+    ax2.set_title("Structural Erosion Trajectory", fontsize=13, fontweight='bold')
+    ax2.legend(fontsize=9)
+    ax2.grid(True, alpha=0.3)
 
-    heatmap_data = []
-    for agent_name in agent_names:
-        trial = trial_results[agent_name]
-        row = []
-        for sr in trial.step_results:
-            if sr.passed:
-                row.append(2)  # Full pass
-            elif sr.new_test_passed:
-                row.append(1)  # New test passed but regression
+    plt.suptitle("DriftBench Entropy Trajectory Analysis", fontsize=14, fontweight='bold', y=1.02)
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    plt.close()
+    print(f"  Saved entropy trajectory: {output_path}")
+
+
+# ── 3. Step Progression Heatmap ───────────────────────────────
+def plot_step_heatmap(all_step_results: dict, output_path: str):
+    """
+    Heatmap showing pass/fail/regression status per step per agent.
+    all_step_results: {agent_name: list of StepResult-like dicts}
+    """
+    agents = list(all_step_results.keys())
+    if not agents:
+        return
+
+    max_steps = max(len(sr) for sr in all_step_results.values())
+    data = np.zeros((len(agents), max_steps))
+
+    for i, agent in enumerate(agents):
+        for j, sr in enumerate(all_step_results[agent]):
+            if sr.get("passed", False):
+                data[i][j] = 2  # full pass
+            elif sr.get("new_test_passed", False):
+                data[i][j] = 1  # new passed but regression
             else:
-                row.append(0)  # Failed
-        while len(row) < max_steps:
-            row.append(-1)  # N/A
-        heatmap_data.append(row)
+                data[i][j] = 0  # fail
 
-    cmap = plt.cm.colors.ListedColormap(['#cccccc', '#FF6B6B', '#FFEAA7', '#4ECDC4'])
-    bounds = [-1.5, -0.5, 0.5, 1.5, 2.5]
-    norm = plt.cm.colors.BoundaryNorm(bounds, cmap.N)
+    fig, ax = plt.subplots(figsize=(max(8, max_steps * 1.5), max(3, len(agents) * 0.8)))
 
-    im = ax2.imshow(heatmap_data, cmap=cmap, norm=norm, aspect='auto')
+    cmap = matplotlib.colors.ListedColormap(['#e74c3c', '#f39c12', '#2ecc71'])
+    bounds = [-0.5, 0.5, 1.5, 2.5]
+    norm = matplotlib.colors.BoundaryNorm(bounds, cmap.N)
 
-    ax2.set_yticks(range(len(agent_names)))
-    ax2.set_yticklabels(agent_names, fontsize=11)
-    ax2.set_xticks(range(max_steps))
-    ax2.set_xticklabels([f"Step {i+1}" for i in range(max_steps)], fontsize=10)
-    ax2.set_title("Step-by-Step Results", fontsize=14, fontweight='bold')
+    im = ax.imshow(data, cmap=cmap, norm=norm, aspect='auto')
 
-    legend_patches = [
-        mpatches.Patch(color='#4ECDC4', label='Full Pass'),
-        mpatches.Patch(color='#FFEAA7', label='New Pass + Regression'),
-        mpatches.Patch(color='#FF6B6B', label='Failed'),
-        mpatches.Patch(color='#cccccc', label='N/A'),
+    ax.set_xticks(range(max_steps))
+    ax.set_xticklabels([f"Step {i+1}" for i in range(max_steps)], fontsize=10)
+    ax.set_yticks(range(len(agents)))
+    ax.set_yticklabels(agents, fontsize=10)
+
+    # Add text annotations
+    for i in range(len(agents)):
+        for j in range(max_steps):
+            if j < len(all_step_results[agents[i]]):
+                sr = all_step_results[agents[i]][j]
+                reg = sr.get("regression_failures", 0)
+                new_p = sr.get("new_tests_passed", sr.get("new_test_passed", 0))
+                if isinstance(new_p, bool):
+                    new_p = 1 if new_p else 0
+                text = f"R:{reg}" if reg > 0 else ("P" if data[i][j] == 2 else "F")
+                ax.text(j, i, text, ha="center", va="center",
+                        color="white", fontsize=9, fontweight="bold")
+
+    legend_elements = [
+        mpatches.Patch(color='#2ecc71', label='Full Pass'),
+        mpatches.Patch(color='#f39c12', label='New Pass + Regression'),
+        mpatches.Patch(color='#e74c3c', label='Fail'),
     ]
-    ax2.legend(handles=legend_patches, loc='upper right', fontsize=9)
+    ax.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1.25, 1))
 
+    plt.title("Step-by-Step Progression Heatmap", fontsize=13, fontweight='bold')
     plt.tight_layout()
-    plt.savefig(output_path, dpi=150, bbox_inches='tight', facecolor='white')
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
     plt.close()
-    print(f"Progression chart saved to {output_path}")
+    print(f"  Saved step heatmap: {output_path}")
 
 
-def plot_overall_comparison(grade_reports: dict, output_path: str):
-    """Bar chart comparing overall scores with dimension breakdown."""
-    fig, ax = plt.subplots(figsize=(12, 6))
+# ── 4. Overall Score Bar Chart ────────────────────────────────
+def plot_overall_comparison(grades: dict, output_path: str):
+    """
+    Grouped bar chart comparing overall scores and sub-dimensions.
+    """
+    agents = list(grades.keys())
+    dimensions = ["Functional", "Regression", "Entropy", "Erosion",
+                   "Consistency", "Refactor", "Taste", "Overall"]
 
-    agent_names = list(grade_reports.keys())
-    dimensions = [
-        ("Functional", "functional_score"),
-        ("Regression", "regression_score"),
-        ("Entropy", "entropy_score"),
-        ("Consistency", "consistency_score"),
-        ("Refactor", "refactor_awareness_score"),
-        ("Taste", "taste_score"),
-    ]
+    fig, ax = plt.subplots(figsize=(14, 6))
+    x = np.arange(len(dimensions))
+    width = 0.8 / len(agents)
 
-    x = np.arange(len(agent_names))
-    width = 0.12
-    dim_colors = ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", "#DDA0DD"]
+    for i, agent in enumerate(agents):
+        g = grades[agent]
+        values = [
+            g.functional_score, g.regression_score, g.entropy_score,
+            g.erosion_score, g.consistency_score, g.refactor_awareness_score,
+            g.taste_score, g.overall_score
+        ]
+        offset = (i - len(agents)/2 + 0.5) * width
+        bars = ax.bar(x + offset, values, width * 0.9, label=agent,
+                      color=_color(agent), alpha=0.85)
+        # Add value labels on top
+        for bar, val in zip(bars, values):
+            ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 1,
+                    f'{val:.0f}', ha='center', va='bottom', fontsize=7)
 
-    for i, (dim_name, dim_key) in enumerate(dimensions):
-        values = [getattr(grade_reports[a], dim_key) for a in agent_names]
-        bars = ax.bar(x + i * width, values, width, label=dim_name,
-                      color=dim_colors[i], edgecolor='white', linewidth=0.5)
-
-    # Add overall score line
-    overall_scores = [grade_reports[a].overall_score for a in agent_names]
-    ax.plot(x + width * 2.5, overall_scores, 'k*-', markersize=15,
-            linewidth=2, label='Overall', zorder=5)
-
-    ax.set_xlabel("Agent", fontsize=12, fontweight='bold')
-    ax.set_ylabel("Score (0-100)", fontsize=12, fontweight='bold')
-    ax.set_title("DriftBench: Multi-Dimensional Agent Comparison",
-                 fontsize=14, fontweight='bold')
-    ax.set_xticks(x + width * 2.5)
-    ax.set_xticklabels(agent_names, fontsize=11)
-    ax.legend(ncol=4, fontsize=9, loc='upper center', bbox_to_anchor=(0.5, -0.1))
-    ax.set_ylim(0, 110)
-    ax.grid(True, axis='y', alpha=0.3)
-
+    ax.set_xticks(x)
+    ax.set_xticklabels(dimensions, fontsize=10)
+    ax.set_ylabel("Score (0-100)", fontsize=11)
+    ax.set_ylim(0, 115)
+    ax.legend(fontsize=9, loc='upper left')
+    ax.grid(axis='y', alpha=0.3)
+    plt.title("DriftBench Overall Score Comparison", fontsize=14, fontweight='bold')
     plt.tight_layout()
-    plt.savefig(output_path, dpi=150, bbox_inches='tight', facecolor='white')
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
     plt.close()
-    print(f"Comparison chart saved to {output_path}")
+    print(f"  Saved overall comparison: {output_path}")
 
 
-def save_results_json(trial_results: dict, grade_reports: dict, output_path: str):
-    """Save all results to a JSON file for reproducibility."""
-    data = {}
-    for agent_name in trial_results:
-        trial = trial_results[agent_name]
-        grade = grade_reports[agent_name]
-        data[agent_name] = {
-            "trial": {
-                "pass_rate": trial.pass_rate,
-                "regression_rate": trial.regression_rate,
-                "entropy_delta": trial.entropy_delta,
-                "total_tokens": trial.total_tokens,
-                "total_actions": trial.total_actions,
-                "total_duration": trial.total_duration,
-                "steps": [
-                    {
-                        "step_id": s.step_id,
-                        "task_type": s.task_type,
-                        "passed": s.passed,
-                        "new_test_passed": s.new_test_passed,
-                        "regression_failures": s.regression_failures,
-                        "total_previous_tests": s.total_previous_tests,
-                        "duration_seconds": s.duration_seconds,
-                        "token_count": s.token_count,
-                    }
-                    for s in trial.step_results
-                ]
-            },
-            "grade": {
-                "functional_score": grade.functional_score,
-                "regression_score": grade.regression_score,
-                "entropy_score": grade.entropy_score,
-                "consistency_score": grade.consistency_score,
-                "refactor_awareness_score": grade.refactor_awareness_score,
-                "taste_score": grade.taste_score,
-                "overall_score": grade.overall_score,
-                "token_efficiency": grade.token_efficiency,
-            }
-        }
+# ── 5. Regression Waterfall ───────────────────────────────────
+def plot_regression_waterfall(all_step_results: dict, output_path: str):
+    """
+    Waterfall chart showing cumulative regression rate per step.
+    """
+    fig, ax = plt.subplots(figsize=(10, 5))
 
-    with open(output_path, "w") as f:
-        json.dump(data, f, indent=2)
-    print(f"Results JSON saved to {output_path}")
+    for agent_name, steps in all_step_results.items():
+        cum_reg = []
+        total_prev = 0
+        total_fail = 0
+        for sr in steps:
+            prev = sr.get("total_previous_tests", 0)
+            fail = sr.get("regression_failures", 0)
+            total_prev += prev
+            total_fail += fail
+            rate = total_fail / max(total_prev, 1)
+            cum_reg.append(rate)
+
+        step_ids = list(range(1, len(cum_reg) + 1))
+        color = _color(agent_name)
+        ax.plot(step_ids, cum_reg, 'o-', label=agent_name, color=color,
+                linewidth=2, markersize=8)
+        ax.fill_between(step_ids, cum_reg, alpha=0.1, color=color)
+
+    ax.set_xlabel("Task Step", fontsize=11)
+    ax.set_ylabel("Cumulative Regression Rate", fontsize=11)
+    ax.set_title("Regression Accumulation Over Task Chain", fontsize=13, fontweight='bold')
+    ax.legend(fontsize=9)
+    ax.grid(True, alpha=0.3)
+    ax.set_ylim(bottom=0)
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    plt.close()
+    print(f"  Saved regression waterfall: {output_path}")
+
+
+# ── 6. Multi-Task Aggregate Dashboard ─────────────────────────
+def plot_multi_task_dashboard(all_task_grades: dict, output_path: str):
+    """
+    Dashboard showing agent performance across multiple seed projects.
+    all_task_grades: {task_name: {agent_name: GradeReport}}
+    """
+    tasks = list(all_task_grades.keys())
+    if not tasks:
+        return
+
+    # Collect all agents
+    all_agents = set()
+    for task_grades in all_task_grades.values():
+        all_agents.update(task_grades.keys())
+    agents = sorted(all_agents)
+
+    fig, axes = plt.subplots(1, len(tasks), figsize=(6 * len(tasks), 5), sharey=True)
+    if len(tasks) == 1:
+        axes = [axes]
+
+    for idx, task in enumerate(tasks):
+        ax = axes[idx]
+        task_grades = all_task_grades[task]
+        agent_names = []
+        overall_scores = []
+        colors = []
+        for agent in agents:
+            if agent in task_grades:
+                agent_names.append(agent.replace("LLM (", "").replace(")", ""))
+                overall_scores.append(task_grades[agent].overall_score)
+                colors.append(_color(agent))
+
+        bars = ax.barh(range(len(agent_names)), overall_scores, color=colors, alpha=0.85)
+        ax.set_yticks(range(len(agent_names)))
+        ax.set_yticklabels(agent_names, fontsize=9)
+        ax.set_xlabel("Overall Score", fontsize=10)
+        ax.set_title(task.replace("_", " ").title(), fontsize=12, fontweight='bold')
+        ax.set_xlim(0, 100)
+        ax.grid(axis='x', alpha=0.3)
+
+        for bar, score in zip(bars, overall_scores):
+            ax.text(bar.get_width() + 1, bar.get_y() + bar.get_height()/2,
+                    f'{score:.1f}', va='center', fontsize=9)
+
+    plt.suptitle("DriftBench Multi-Task Performance Dashboard",
+                 fontsize=14, fontweight='bold', y=1.02)
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    plt.close()
+    print(f"  Saved multi-task dashboard: {output_path}")
+
+
+# ── Save results to JSON ──────────────────────────────────────
+def save_results_json(all_results: dict, output_path: str):
+    """Save all results to a structured JSON file."""
+
+    def _serialize(obj):
+        if hasattr(obj, '__dict__'):
+            d = {}
+            for k, v in obj.__dict__.items():
+                d[k] = _serialize(v)
+            return d
+        elif isinstance(obj, list):
+            return [_serialize(item) for item in obj]
+        elif isinstance(obj, dict):
+            return {k: _serialize(v) for k, v in obj.items()}
+        else:
+            return obj
+
+    serialized = _serialize(all_results)
+    with open(output_path, 'w') as f:
+        json.dump(serialized, f, indent=2, default=str)
+    print(f"  Saved results JSON: {output_path}")

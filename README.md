@@ -1,89 +1,150 @@
-# DriftBench: Measuring Code Entropy Resistance in AI Agents
+# DriftBench v2.0
+
+**A Benchmark for Measuring Coding Agent Entropy Resistance Under Iterative Development**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
-DriftBench is a novel benchmark designed to evaluate an AI coding agent's **Entropy Resistance** during long-term software evolution. 
+> DriftBench evaluates whether coding agents can maintain code quality, architectural coherence, and backward compatibility across a chain of iterative development tasks — not just solve isolated problems.
 
-While existing benchmarks like SWE-bench measure an agent's ability to fix a single bug in a frozen snapshot, DriftBench evaluates agents on a **Task Chain**—a sequence of consecutive tasks (feature additions, bug fixes, and refactoring requests) on the *same* codebase. It measures not just functional correctness, but whether the codebase becomes more or less maintainable over time.
+![DriftBench Heatmap](results/task_difficulty_heatmap.png)
 
-![DriftBench Comparison](results/overall_comparison.png)
+---
 
-## The Motivation
+## What Makes DriftBench Different?
 
-In early 2026, the AI engineering community recognized a critical limitation in existing evaluations: 75% of AI coding agents introduce regressions during long-term maintenance [1]. 
+Existing coding benchmarks (SWE-bench, HumanEval, MBPP) test agents on **single-shot** tasks. Real software engineering is **iterative**: features pile up, bugs get fixed, code gets refactored. DriftBench measures what happens when an agent must evolve a codebase through a **5-step task chain** of increasing complexity:
 
-If an agent simply appends `if/else` statements to pass the current test without refactoring, the codebase quickly becomes unmaintainable. We call this phenomenon **Code Entropy**. DriftBench was built to quantify this entropy and evaluate whether agents possess the "engineering taste" required for autonomous, long-horizon development.
-
-## Core Evaluation Dimensions
-
-DriftBench evaluates agents across six dimensions, combining deterministic static analysis with LLM-as-a-Judge evaluations:
-
-1. **Functional Correctness**: Does the new code pass the new tests?
-2. **Regression Resistance**: Does the new code break previously passing tests?
-3. **Entropy Delta**: How much did the Cyclomatic Complexity (CC) and Code Duplication Rate change?
-4. **Architectural Consistency** (LLM Judge): Does the code feel like it was written by one author?
-5. **Refactor Awareness** (LLM Judge): Did the agent proactively manage technical debt?
-6. **Engineering Taste** (LLM Judge): Are the variable names, error handling, and abstractions sensible?
-
-## Demo Results
-
-We ran a 5-step evolution task on a minimal TODO API using two agents:
-1. **Naive Baseline**: An agent that simply appends code to the end of the file without modifying existing logic.
-2. **LLM Agent (gpt-4.1-mini)**: A standard zero-shot LLM coding agent.
-
-### The Refactoring Trap
-
-![Step Progression](results/step_progression.png)
-
-As shown in the progression chart above, the LLM Agent successfully completed the first 3 feature/bugfix steps. However, at Step 4 (a major refactoring request), it successfully implemented the new structure but **broke 2 out of 3 previous tests** (a 66% regression rate for that step). 
-
-The Naive Baseline had a 0% regression rate because it never touched existing code—but it scored terribly on the LLM-as-Judge metrics for Taste and Consistency.
-
-![Radar Chart](results/radar_chart.png)
-
-The radar chart illustrates the trade-off: The LLM agent has great "Taste" and "Refactor Awareness", but struggles with "Regression Resistance" during complex refactoring.
-
-## Installation & Usage
-
-### Prerequisites
-- Python 3.11+
-- OpenAI API Key (for LLM-as-a-Judge and the LLM Agent)
-
-### Setup
-```bash
-git clone https://github.com/Randyxian/driftbench.git
-cd driftbench
-pip install -r requirements.txt
 ```
-*(Note: You can install the required packages manually: `pip install radon pytest openai matplotlib numpy`)*
-
-### Running the Benchmark
-
-To run the benchmark with the default Naive Baseline:
-```bash
-python run_benchmark.py
+Step 1: Feature Addition → Step 2: Bug Fix → Step 3: Feature Addition
+→ Step 4: Refactor (the trap!) → Step 5: Evolution
 ```
 
-To run the benchmark with the LLM Agent (requires `OPENAI_API_KEY`):
+### Core Insight: The Refactor Trap
+
+Our experiments reveal that LLM agents suffer **67-100% regression rates** at Step 4 (refactoring), even when they pass all previous steps perfectly. This is the "entropy drift" that DriftBench is designed to measure.
+
+![Refactor Trap](results/refactor_trap_analysis.png)
+
+---
+
+## v2.0 Improvements Over v1.0
+
+| Feature | v1.0 | v2.0 |
+|---------|------|------|
+| Seed Projects | 1 (todo_api) | **4** (todo_api, calculator, markdown_parser, file_manager) |
+| Test Granularity | File-level | **Test-case-level** (pytest JSON parsing) |
+| Entropy Tracking | Head-tail only | **Per-step CC + Structural Erosion trajectory** |
+| Test Isolation | Tests visible to agent | **Tests hidden from agent sandbox** |
+| LLM Judge | Single model | **Multi-model cross-validation** (Cohen's Kappa) |
+| Models Tested | GPT-4.1-mini only | **gpt-4.1-mini, gpt-4.1-nano, gemini-2.5-flash** |
+| Scoring Dimensions | 6 | **7** (added Structural Erosion) |
+| Visualizations | 3 charts | **11 chart types** including heatmaps, scatter plots |
+
+---
+
+## Quick Start
+
 ```bash
-export OPENAI_API_KEY="your-api-key-here"
-python run_benchmark.py --with-llm --model gpt-4.1-mini
+# Install dependencies
+pip install openai radon pytest matplotlib numpy
+
+# Run with naive baseline only (no API key needed)
+python run_benchmark.py --tasks todo_api --no-llm-agent --no-llm-judge
+
+# Run full benchmark with LLM agents
+export OPENAI_API_KEY="your-key"
+python run_benchmark.py \
+  --tasks todo_api calculator markdown_parser file_manager \
+  --models gpt-4.1-mini gpt-4.1-nano gemini-2.5-flash
+
+# Run specific task with specific model
+python run_benchmark.py --tasks calculator --models gpt-4.1-mini
 ```
 
-The results, including JSON reports and visualization charts, will be saved in the `results/` directory.
+---
 
-## Project Structure
+## Architecture
 
-- `driftbench/harness.py`: Core execution engine that isolates the sandbox and runs task chains.
-- `driftbench/grader.py`: Evaluation logic combining static analysis (`radon`) and LLM judging.
-- `driftbench/agents.py`: Implementations of the Naive Baseline and LLM Agent.
-- `driftbench/visualize.py`: Matplotlib-based chart generation.
-- `tasks/todo_api/`: The seed project and the 5-step task chain definitions.
+```
+driftbench/
+├── driftbench/
+│   ├── harness.py      # Core evaluation harness (sandbox, test runner, CC tracker)
+│   ├── agents.py       # Agent implementations (Naive Baseline + LLM agents)
+│   ├── grader.py       # Multi-dimensional scoring + LLM-as-Judge
+│   └── visualize.py    # Publication-quality chart generation
+├── tasks/
+│   ├── todo_api/       # Seed project 1: REST-like TODO manager
+│   ├── calculator/     # Seed project 2: Calculator with history
+│   ├── markdown_parser/# Seed project 3: Markdown-to-HTML converter
+│   └── file_manager/   # Seed project 4: In-memory file system
+├── results/            # Generated charts and JSON results
+├── run_benchmark.py    # CLI entry point
+└── generate_all_charts.py  # Cross-task visualization generator
+```
 
-## Contributing
+---
 
-DriftBench is currently a Proof-of-Concept (PoC). Contributions to expand the task chains, add support for more agent frameworks (e.g., OpenHands, AutoGPT), or refine the LLM-as-a-Judge prompts are highly welcome.
+## Scoring Dimensions (7 axes)
+
+| Dimension | Weight | What It Measures |
+|-----------|--------|------------------|
+| Functional Correctness | 25% | Pass rate on new test cases per step |
+| Regression Resistance | 25% | Ability to preserve previously passing tests |
+| Entropy Resistance | 10% | Cyclomatic complexity growth control |
+| Structural Erosion | 10% | Code structure degradation (function count, avg length) |
+| Architectural Consistency | 10% | LLM Judge: naming, patterns, modularity |
+| Refactor Awareness | 10% | LLM Judge: quality of structural changes |
+| Engineering Taste | 10% | LLM Judge: idiomatic style, error handling |
+
+![Radar Chart](results/aggregate_radar.png)
+
+---
+
+## Experiment Results (v2.0)
+
+### Cross-Task Summary
+
+| Task | gpt-4.1-mini | gpt-4.1-nano | gemini-2.5-flash | Naive Baseline |
+|------|-------------|-------------|------------------|----------------|
+| todo_api | 62.6 | 56.4 | 65.1 | 66.2 |
+| calculator | **84.7** | 81.9 | 84.6 | 53.8 |
+| markdown_parser | **73.1** | 73.0 | 55.1 | 51.9 |
+| file_manager | 48.8 | 50.9 | 43.9 | 50.8 |
+| **Average** | **67.3** | **65.6** | **62.2** | **55.7** |
+
+### Key Findings
+
+1. **The Refactor Trap is real and reproducible**: Step 4 regression rates of 67-100% across 3 of 4 tasks for all LLM agents.
+
+2. **Task difficulty matters**: Calculator (simple state) sees 100% pass rates; file_manager (complex path handling) drops to 20-40%.
+
+3. **Regression is the differentiator**: All agents achieve similar pass rates, but regression resistance varies dramatically (0% to 100%).
+
+4. **gemini-2.5-flash is most regression-prone**: 85.7% regression on markdown_parser, 100% on file_manager.
+
+![Pass vs Regression](results/pass_vs_regression_scatter.png)
+
+---
+
+## Adding New Seed Projects
+
+Create a new directory under `tasks/` with:
+
+```
+tasks/my_project/
+├── app.py              # Initial seed code
+├── task_chain.json     # 5-step task chain definition
+├── test_step1_*.py     # Test file for step 1
+├── test_step2_*.py     # Test file for step 2
+├── test_step3_*.py     # Test file for step 3
+├── test_step4_*.py     # Test file for step 4 (refactor!)
+└── test_step5_*.py     # Test file for step 5
+```
+
+Then run: `python run_benchmark.py --tasks my_project`
+
+---
 
 ## References
 
@@ -93,4 +154,21 @@ DriftBench is currently a Proof-of-Concept (PoC). Contributions to expand the ta
 [4] Zhu et al. "Needle in the Repo: A Benchmark for Maintainability in AI-Generated Repository Edits". arXiv:2603.27745, Mar 2026.
 
 ---
-*Created by Randy Xian. Inspired by the challenges of building production-grade Agent Swarms.*
+
+## Citation
+
+```
+@misc{driftbench2025,
+  title={DriftBench: Measuring Coding Agent Entropy Resistance Under Iterative Development},
+  author={Randy},
+  year={2025},
+  url={https://github.com/Randy-sin/driftbench}
+}
+```
+
+## License
+
+MIT
+
+---
+*Created by Randy. Inspired by the challenges of building production-grade Agent Swarms.*

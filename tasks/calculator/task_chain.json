@@ -1,0 +1,36 @@
+{
+  "name": "calculator_evolution",
+  "description": "A 5-step task chain that evolves a minimal calculator, testing the agent's ability to maintain code quality across feature additions, bug fixes, and refactoring.",
+  "steps": [
+    {
+      "step_id": 1,
+      "task_type": "feature",
+      "instruction": "Add a history feature to the calculator. Create a module-level list called 'history' that records every operation. Each entry should be a dict with keys 'operation' (str like 'add'), 'operands' (list of numbers), and 'result' (the computed value). Add a function get_history() that returns the full history list, and clear_history() that empties it.",
+      "test_file": "test_step1_history.py"
+    },
+    {
+      "step_id": 2,
+      "task_type": "bugfix",
+      "instruction": "Fix the divide function to handle edge cases properly: (1) divide(0, 0) should raise ZeroDivisionError, (2) divide with very large numbers should work without overflow (use Python's arbitrary precision), and (3) the result should always be a float, not an int. Also ensure that failed operations (exceptions) are NOT recorded in history.",
+      "test_file": "test_step2_bugfix.py"
+    },
+    {
+      "step_id": 3,
+      "task_type": "feature",
+      "instruction": "Add support for advanced math operations: power(a, b) which returns a raised to the power of b, sqrt(a) which returns the square root of a (raise ValueError for negative numbers with message containing 'negative'), and modulo(a, b) which returns a mod b (raise ZeroDivisionError for b=0). All new operations should also be recorded in history.",
+      "test_file": "test_step3_advanced.py"
+    },
+    {
+      "step_id": 4,
+      "task_type": "refactor",
+      "instruction": "Refactor the code to use a Calculator class that encapsulates all state and operations. Each Calculator instance should have its own independent history. The class should have methods: add, subtract, multiply, divide, power, sqrt, modulo, get_history, clear_history. Keep the module-level functions working for backward compatibility (they can delegate to a default Calculator instance).",
+      "test_file": "test_step4_refactor.py"
+    },
+    {
+      "step_id": 5,
+      "task_type": "evolution",
+      "instruction": "Add an expression evaluator to the Calculator class. Add a method evaluate(expr: str) -> float that can parse and evaluate simple mathematical expressions containing numbers, +, -, *, /, parentheses, and ** (power). For example: evaluate('2 + 3 * 4') should return 14.0, evaluate('(2 + 3) * 4') should return 20.0. The evaluation should record a single history entry with operation='evaluate', operands=[expr], result=<value>. Raise ValueError for invalid expressions with message containing 'invalid'.",
+      "test_file": "test_step5_eval.py"
+    }
+  ]
+}

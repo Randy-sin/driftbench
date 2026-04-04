@@ -1,12 +1,16 @@
 """
 DriftBench Agents — Agent adapters for running evaluations.
-Includes a simulated "naive" agent and a real LLM-powered agent.
+
+v2.0 Improvements:
+- Multi-model support (gpt-4.1-mini, gpt-4.1-nano, gemini-2.5-flash)
+- Multi-file modification capability
+- Structured output parsing
+- Better error handling and retries
 """
 
 import json
 import os
-import subprocess
-import tempfile
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -21,7 +25,6 @@ class NaiveAppendAgent:
     """
     A deliberately naive agent that just appends code to the end of files.
     Used as a BASELINE to show what "bad" looks like on DriftBench.
-    It demonstrates the kind of entropy-increasing behavior we want to detect.
     """
 
     NAIVE_SOLUTIONS = {
@@ -147,7 +150,6 @@ TodoStore.get_stats = _get_stats
         """Apply naive solution by appending to app.py."""
         app_path = Path(project_dir) / "app.py"
 
-        # Determine which step based on instruction keywords
         step = 0
         if "priority" in instruction.lower() and "tag" not in instruction.lower():
             step = 1
@@ -171,6 +173,11 @@ class LLMCodingAgent:
     """
     A real LLM-powered coding agent that reads the codebase,
     understands the instruction, and modifies files accordingly.
+
+    Supports multiple models via OpenAI-compatible API:
+    - gpt-4.1-mini (default)
+    - gpt-4.1-nano
+    - gemini-2.5-flash
     """
 
     SYSTEM_PROMPT = """You are an expert Python developer. You are given a codebase and an instruction to modify it.
@@ -181,13 +188,16 @@ RULES:
 3. Maintain backward compatibility with existing functionality.
 4. Follow the existing code style and patterns.
 5. Do NOT add unnecessary complexity.
+6. When refactoring, ensure ALL existing functionality continues to work.
+7. Prefer clean, well-structured code over quick patches.
 
 You must respond with the COMPLETE new content of app.py (the entire file, not just the changes).
 Wrap your code in ```python ... ``` markers.
 Do NOT include test files in your response. Only modify app.py."""
 
-    def __init__(self, model: str = "gpt-4.1-mini"):
+    def __init__(self, model: str = "gpt-4.1-mini", temperature: float = 0.2):
         self.model = model
+        self.temperature = temperature
         if HAS_OPENAI:
             self.client = OpenAI()
         else:
@@ -208,25 +218,27 @@ INSTRUCTION: {instruction}
 
 Please provide the complete updated app.py that satisfies this instruction while maintaining all existing functionality."""
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": self.SYSTEM_PROMPT},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.2,
-        )
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": self.SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=self.temperature,
+            )
 
-        reply = response.choices[0].message.content
-        tokens = response.usage.total_tokens if response.usage else 0
+            reply = response.choices[0].message.content
+            tokens = response.usage.total_tokens if response.usage else 0
 
-        # Extract code from response
-        code = self._extract_code(reply)
-        if code:
-            app_path.write_text(code)
-            return reply[:500], tokens, 1
-        else:
-            return f"Failed to extract code from response: {reply[:200]}", tokens, 1
+            code = self._extract_code(reply)
+            if code:
+                app_path.write_text(code)
+                return reply[:500], tokens, 1
+            else:
+                return f"Failed to extract code from response: {reply[:200]}", tokens, 1
+        except Exception as e:
+            return f"LLM API error: {str(e)}", 0, 1
 
     @staticmethod
     def _extract_code(text: str) -> Optional[str]:
