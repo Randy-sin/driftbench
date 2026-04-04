@@ -1,0 +1,36 @@
+{
+  "name": "todo_api_evolution",
+  "description": "A 5-step task chain that evolves a minimal TODO app, testing the agent's ability to maintain code quality across feature additions, bug fixes, and refactoring.",
+  "steps": [
+    {
+      "step_id": 1,
+      "task_type": "feature",
+      "instruction": "Add priority support to the TODO app. Each todo should have an optional 'priority' field that can be 'low', 'medium', or 'high' (default: 'medium'). The add_todo function should accept a 'priority' keyword argument. The get_todos function should accept a 'sort_by_priority' keyword argument that, when True, returns todos sorted from high to low priority.",
+      "test_file": "test_step1_priority.py"
+    },
+    {
+      "step_id": 2,
+      "task_type": "bugfix",
+      "instruction": "Fix a bug in the complete_todo function: currently, calling complete_todo with a non-existent ID silently returns None, and calling it on an already-completed todo succeeds without error. Change the behavior so that: (1) completing a non-existent todo raises a ValueError with a message containing 'not found', and (2) completing an already-done todo raises a ValueError with a message containing 'already'.",
+      "test_file": "test_step2_bugfix.py"
+    },
+    {
+      "step_id": 3,
+      "task_type": "feature",
+      "instruction": "Add a tagging system to todos. Each todo should support an optional 'tags' keyword argument (a list of strings, default: empty list). The get_todos function should support a 'filter_tag' keyword argument that filters todos to only those containing the specified tag.",
+      "test_file": "test_step3_tags.py"
+    },
+    {
+      "step_id": 4,
+      "task_type": "refactor",
+      "instruction": "Refactor the code to eliminate global state. Create a TodoStore class that encapsulates all todo state and operations (add_todo, get_todos, get_todo, complete_todo). Each TodoStore instance should have independent state. The class must support all previously added features (priority, tags, sorting, filtering, error handling). Keep the module-level functions working as well for backward compatibility (they can delegate to a default TodoStore instance).",
+      "test_file": "test_step4_refactor.py"
+    },
+    {
+      "step_id": 5,
+      "task_type": "evolution",
+      "instruction": "Add a get_stats() method to the TodoStore class that returns a dictionary with summary statistics: 'total' (total todos), 'completed' (completed count), 'pending' (pending count), 'completion_rate' (percentage as float, e.g. 50.0), 'by_priority' (dict mapping priority to count), and 'by_tag' (dict mapping each tag to the count of todos with that tag).",
+      "test_file": "test_step5_stats.py"
+    }
+  ]
+}

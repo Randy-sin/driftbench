@@ -1,0 +1,160 @@
+{
+  "Naive Baseline": {
+    "trial": {
+      "pass_rate": 0.6,
+      "regression_rate": 0.0,
+      "entropy_delta": {
+        "cc_before": 2.78,
+        "cc_after": 2.85,
+        "cc_delta": 0.07,
+        "duplication_before": 0.08,
+        "duplication_after": 0.5102,
+        "duplication_delta": 0.4302
+      },
+      "total_tokens": 0,
+      "total_actions": 5,
+      "total_duration": 0.0,
+      "steps": [
+        {
+          "step_id": 1,
+          "task_type": "feature",
+          "passed": true,
+          "new_test_passed": true,
+          "regression_failures": 0,
+          "total_previous_tests": 0,
+          "duration_seconds": 0.0,
+          "token_count": 0
+        },
+        {
+          "step_id": 2,
+          "task_type": "bugfix",
+          "passed": true,
+          "new_test_passed": true,
+          "regression_failures": 0,
+          "total_previous_tests": 1,
+          "duration_seconds": 0.0,
+          "token_count": 0
+        },
+        {
+          "step_id": 3,
+          "task_type": "feature",
+          "passed": true,
+          "new_test_passed": true,
+          "regression_failures": 0,
+          "total_previous_tests": 2,
+          "duration_seconds": 0.0,
+          "token_count": 0
+        },
+        {
+          "step_id": 4,
+          "task_type": "refactor",
+          "passed": false,
+          "new_test_passed": false,
+          "regression_failures": 0,
+          "total_previous_tests": 3,
+          "duration_seconds": 0.0,
+          "token_count": 0
+        },
+        {
+          "step_id": 5,
+          "task_type": "evolution",
+          "passed": false,
+          "new_test_passed": false,
+          "regression_failures": 0,
+          "total_previous_tests": 3,
+          "duration_seconds": 0.0,
+          "token_count": 0
+        }
+      ]
+    },
+    "grade": {
+      "functional_score": 60.0,
+      "regression_score": 100.0,
+      "entropy_score": 80.0,
+      "consistency_score": 30.0,
+      "refactor_awareness_score": 20.0,
+      "taste_score": 25.0,
+      "overall_score": 64.8,
+      "token_efficiency": 0.0
+    }
+  },
+  "LLM (gpt-4.1-mini)": {
+    "trial": {
+      "pass_rate": 0.6,
+      "regression_rate": 0.4,
+      "entropy_delta": {
+        "cc_before": 2.78,
+        "cc_after": 3.0,
+        "cc_delta": 0.22,
+        "duplication_before": 0.08,
+        "duplication_after": 0.0972,
+        "duplication_delta": 0.0172
+      },
+      "total_tokens": 5750,
+      "total_actions": 5,
+      "total_duration": 30.88,
+      "steps": [
+        {
+          "step_id": 1,
+          "task_type": "feature",
+          "passed": true,
+          "new_test_passed": true,
+          "regression_failures": 0,
+          "total_previous_tests": 0,
+          "duration_seconds": 4.88,
+          "token_count": 778
+        },
+        {
+          "step_id": 2,
+          "task_type": "bugfix",
+          "passed": true,
+          "new_test_passed": true,
+          "regression_failures": 0,
+          "total_previous_tests": 1,
+          "duration_seconds": 3.85,
+          "token_count": 902
+        },
+        {
+          "step_id": 3,
+          "task_type": "feature",
+          "passed": true,
+          "new_test_passed": true,
+          "regression_failures": 0,
+          "total_previous_tests": 2,
+          "duration_seconds": 4.95,
+          "token_count": 984
+        },
+        {
+          "step_id": 4,
+          "task_type": "refactor",
+          "passed": false,
+          "new_test_passed": true,
+          "regression_failures": 2,
+          "total_previous_tests": 3,
+          "duration_seconds": 7.81,
+          "token_count": 1328
+        },
+        {
+          "step_id": 5,
+          "task_type": "evolution",
+          "passed": false,
+          "new_test_passed": true,
+          "regression_failures": 2,
+          "total_previous_tests": 4,
+          "duration_seconds": 9.39,
+          "token_count": 1758
+        }
+      ]
+    },
+    "grade": {
+      "functional_score": 60.0,
+      "regression_score": 60.0,
+      "entropy_score": 80.0,
+      "consistency_score": 95.0,
+      "refactor_awareness_score": 90.0,
+      "taste_score": 90.0,
+      "overall_score": 74.8,
+      "token_efficiency": 1916.6666666666667
+    }
+  }
+}
