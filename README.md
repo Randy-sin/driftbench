@@ -18,6 +18,54 @@ While most benchmarks (like SWE-bench or HumanEval) focus on single-shot problem
 DriftBench reveals a critical vulnerability in current LLMs: **The Refactor Trap**. 
 When asked to refactor code (Step 4 in our task chains), agents frequently break existing functionality, with regression rates spiking up to 100%. DriftBench specifically measures an agent's ability to navigate this trap.
 
+<p align="center">
+  <img src="results/charts/refactor_trap_analysis.png" alt="The Refactor Trap" width="700">
+</p>
+
+## Results
+
+### Overall Scores Across Tasks and Agents
+
+<p align="center">
+  <img src="results/charts/task_difficulty_heatmap.png" alt="Task Difficulty Heatmap" width="700">
+</p>
+
+### Step-by-Step Progression
+
+<p align="center">
+  <img src="results/charts/step_heatmap.png" alt="Step Heatmap" width="700">
+</p>
+
+### 7-Dimension Agent Capabilities
+
+<p align="center">
+  <img src="results/charts/radar_chart_v2.png" alt="Radar Chart" width="600">
+</p>
+
+### Pass Rate vs Regression Rate
+
+<p align="center">
+  <img src="results/charts/pass_vs_regression_scatter.png" alt="Pass vs Regression" width="600">
+</p>
+
+### Entropy Trajectory
+
+<p align="center">
+  <img src="results/charts/entropy_trajectory.png" alt="Entropy Trajectory" width="700">
+</p>
+
+### Cross-Task Performance Dashboard
+
+<p align="center">
+  <img src="results/charts/multi_task_dashboard.png" alt="Multi-Task Dashboard" width="700">
+</p>
+
+### Agent Ranking
+
+<p align="center">
+  <img src="results/charts/agent_ranking.png" alt="Agent Ranking" width="600">
+</p>
+
 ## Installation
 
 ```bash
@@ -87,6 +135,8 @@ driftbench/
 │   ├── grader.py        # Multi-dimensional scoring system and LLM Judge
 │   └── visualize.py     # Publication-quality chart generation
 ├── tasks/               # Seed projects and task chains
+├── results/
+│   └── charts/          # Generated visualization charts
 ├── run_benchmark.py     # Main CLI entry point
 └── generate_all_charts.py  # Standalone chart regeneration
 ```
