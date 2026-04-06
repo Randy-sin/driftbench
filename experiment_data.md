@@ -1,4 +1,4 @@
-# DriftBench v2.0 Experiment Results
+# DriftBench Experiment Results
 
 ## Raw Data Summary (4 tasks × 4 agents = 16 experiments)
 
